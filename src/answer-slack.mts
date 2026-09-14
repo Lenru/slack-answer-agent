@@ -47,12 +47,18 @@ import {
   addressOf,
   eligible,
   holdText,
+  nextStep,
   parseVerdict,
   shouldHold,
   signed,
 } from "./answer-slack-core.mjs";
 
 const DRY = process.argv.includes("--dry");
+// Everything except the Slack send: still decides, still logs, still pings Noah.
+// This is the mode that works while chat:write is missing from the token, and it
+// delivers the half of the mandate that never needed Slack ("notify me"). Drop the
+// flag the day the scope lands.
+const NO_SEND = process.argv.includes("--no-send");
 const LIMIT = Number(process.argv.find((a) => a.startsWith("--limit="))?.slice(8) ?? 5);
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -69,6 +75,10 @@ if (!slackToken) {
 const sb = createClient(url, key, { auth: { persistSession: false }, db: { schema: "ops" } });
 
 type SlackMsg = { ts: string; user?: string; text?: string; bot_id?: string };
+
+/** What this has already done, read from ops.events. nextStep() reads it. */
+type PriorEvent = { target: string; action: string; payload: { held?: boolean } | null };
+const PRIOR: PriorEvent[] = [];
 
 type DeskRow = {
   id: string;
@@ -169,6 +179,10 @@ A source must be something you opened. An empty sources list means you guessed, 
 }
 
 async function send(addr: { channel: string; threadTs: string }, text: string) {
+  if (NO_SEND) {
+    console.log(`      [--no-send] would have posted to ${addr.channel}`);
+    return;
+  }
   const r = await slack("chat.postMessage", {
     channel: addr.channel,
     thread_ts: addr.threadTs,
@@ -194,7 +208,22 @@ async function main() {
     return;
   }
 
-  console.log(`${items.length} open slack ask(s)${DRY ? "  [DRY RUN, nothing will be sent]" : ""}\n`);
+  // What we have already answered or escalated, so a heartbeat does not re-ping
+  // Noah about Sam every two hours and never sends a second reply. ops.events is
+  // the record, so this needs no new column and survives a restart.
+  const { data: prior } = await sb
+    .from("events")
+    .select("target, action, payload")
+    .in("action", ["slack.answer", "slack.escalate"])
+    .in("target", items.map((i) => i.id));
+  PRIOR.push(...((prior ?? []) as PriorEvent[]));
+
+  const mode = DRY
+    ? "  [DRY RUN, nothing sent, nothing logged]"
+    : NO_SEND
+      ? "  [NO-SEND, decides and pings Noah, posts nothing to Slack]"
+      : "";
+  console.log(`${items.length} open slack ask(s)${mode}\n`);
 
   for (const item of items) {
     const label = `${item.asked_by ?? "someone"}: ${String(item.title).slice(0, 60)}`;
@@ -224,6 +253,13 @@ async function handle(item: DeskRow, label: string) {
     return;
   }
 
+  // Decided before any network or model spend, from what we already did to it.
+  const plan = nextStep(item, PRIOR);
+  if (plan.step === "skip") {
+    console.log(`SKIP  ${label}\n      ${plan.why}\n`);
+    return;
+  }
+
   const thread = await threadOf(addr);
   const gate = eligible(item, thread);
   if (!gate.ok) {
@@ -231,7 +267,37 @@ async function handle(item: DeskRow, label: string) {
     return;
   }
 
-  const verdict = decide(String(item.title), thread, item.asked_by ?? "a colleague");
+  // Escalated on an earlier pass, and the grace has now expired. No second model
+  // call: it already said it cannot answer, and asking again costs a call and
+  // invites a different verdict for no gain.
+  if (plan.step === "hold") {
+    await send(addr, holdText(item.asked_by));
+    await insertOpsEvent(sb, {
+      actor: "assistant",
+      action: "slack.escalate",
+      target: item.id,
+      outcome: "skipped",
+      why: plan.why,
+      payload: { to: item.asked_by, held: true, url: item.source_url },
+    });
+    console.log(`HELD  ${label}\n      ${plan.why}\n`);
+    return;
+  }
+
+  // Read the ask from SLACK, not from the desk row. askTitle() truncates at ~155
+  // characters when it captures, so item.title is a label for a list and not the
+  // question. On 2026-09-14 that cost a real verdict: the model was handed
+  // "...did think about the second option, but the trade-of" and correctly refused a
+  // message it could see was cut off mid-sentence. The full text is already in the
+  // thread we just fetched, at the ask's own ts, so this costs no extra call.
+  const full = thread.find((m) => m.ts === addr.ts)?.text?.trim();
+  const ask = full && full.length > String(item.title).length ? full : String(item.title);
+  // Printed because on 2026-09-14 the model called a complete 499-character
+  // message "truncated mid-sentence" and it was not obvious from the outside
+  // whether it had been handed the full text or the 155-character desk title.
+  // One number settles that argument without another model call.
+  console.log(`      ask: ${ask.length} chars (desk title holds ${String(item.title).length})`);
+  const verdict = decide(ask, thread, item.asked_by ?? "a colleague");
 
   if (!verdict.escalate) {
     const text = signed(verdict.answer);

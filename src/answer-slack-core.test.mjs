@@ -6,6 +6,7 @@ import {
   eligible,
   holdText,
   parseVerdict,
+  nextStep,
   shouldHold,
   signed,
 } from "./answer-slack-core.mjs";
@@ -83,11 +84,6 @@ test("the clinic lane never gets answered from here", () => {
   assert.equal(eligible(item, []).ok, false);
 });
 
-test("a second pass does not re-send", () => {
-  const item = { title: "anything", source_url: REAL };
-  assert.equal(eligible(item, [], { alreadyTried: true }).ok, false);
-});
-
 test("a holding reply waits two hours, so it never lands while Noah is reading", () => {
   const now = Date.parse("2026-09-14T12:00:00Z");
   assert.equal(shouldHold({ created_at: "2026-09-14T11:58:00Z" }, now), false);
@@ -127,4 +123,44 @@ test("the signature is added once and never twice", () => {
   assert.ok(signed("hello").endsWith(SIGNATURE));
   const once = signed(`hello\n\n${SIGNATURE}`);
   assert.equal(once.split(SIGNATURE).length - 1, 1);
+});
+
+// The hourly-heartbeat trap: an ask seen while still too recent to hold must not
+// be written off, or the holding reply Noah asked for never fires at all.
+const NOW = Date.parse("2026-09-14T12:00:00Z");
+const fresh = { id: "t1", created_at: "2026-09-14T11:15:00Z" };  // 45 min old
+const old = { id: "t1", created_at: "2026-09-14T09:00:00Z" };    // 3 h old
+
+test("an ask nobody has looked at gets a model call", () => {
+  assert.equal(nextStep(fresh, [], NOW).step, "decide");
+});
+
+test("an answered ask is never touched again", () => {
+  const prior = [{ target: "t1", action: "slack.answer", payload: {} }];
+  assert.equal(nextStep(fresh, prior, NOW).step, "skip");
+});
+
+test("escalated but too recent to hold stays open, it does not become done", () => {
+  const prior = [{ target: "t1", action: "slack.escalate", payload: { held: false } }];
+  const got = nextStep(fresh, prior, NOW);
+  assert.equal(got.step, "skip");
+  assert.match(got.why, /grace/);
+});
+
+test("the same ask holds once the grace passes, with no second model call", () => {
+  const prior = [{ target: "t1", action: "slack.escalate", payload: { held: false } }];
+  assert.equal(nextStep(old, prior, NOW).step, "hold");
+});
+
+test("once held, it stops for good and never holds twice", () => {
+  const prior = [
+    { target: "t1", action: "slack.escalate", payload: { held: false } },
+    { target: "t1", action: "slack.escalate", payload: { held: true } },
+  ];
+  assert.equal(nextStep(old, prior, NOW).step, "skip");
+});
+
+test("another task's history is not this task's history", () => {
+  const prior = [{ target: "SOMEONE-ELSE", action: "slack.answer", payload: {} }];
+  assert.equal(nextStep(fresh, prior, NOW).step, "decide");
 });

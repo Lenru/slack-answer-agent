@@ -53,14 +53,10 @@ export function addressOf(permalink) {
  *  - Someone already replied after the ask. Noah answers by hand constantly, and
  *    the sender must never talk over him. This is checked against the live thread
  *    rather than against a flag, because the flag would be the thing that is stale.
- *  - Already handled here. One attempt per ask; a second pass must not re-send.
  *  - The Clinic lane. FORBIDDEN_LANES in desk-rules, enforced again at the send
  *    boundary. the client is not on this path at all.
  */
-export function eligible(item, thread, opts = {}) {
-  const { alreadyTried = false } = opts;
-
-  if (alreadyTried) return { ok: false, why: "already attempted" };
+export function eligible(item, thread) {
   if (/\bclinic\b|\bclient\b/i.test(`${item.title ?? ""} ${item.asked_by ?? ""}`)) {
     return { ok: false, why: "clinic lane, never answered from here" };
   }
@@ -145,4 +141,43 @@ export function parseVerdict(raw) {
 /** Append the signature if the model forgot it. checkOutbound blocks without it. */
 export function signed(answer) {
   return answer.includes(SIGNATURE) ? answer : `${answer.trimEnd()}\n\n${SIGNATURE}`;
+}
+
+/**
+ * What to do with an ask, given what we have already done to it.
+ *
+ * This exists because an hourly heartbeat broke the naive version. An ask that
+ * arrives at 09:15 is looked at 10:00, is only 45 minutes old, so it is too
+ * recent for a holding reply. If that pass marks the ask "attempted", every later
+ * pass skips it and the holding reply NEVER fires: the one case Noah explicitly
+ * asked for, a polite "we will come back to you", would be the case that silently
+ * never happened.
+ *
+ * So "attempted" is not one state. An escalation that has not yet held is
+ * unfinished work, and the grace period has to be allowed to expire.
+ *
+ *   answered            -> done, never touch it again
+ *   escalated and held  -> done, Noah has been told and they have been told
+ *   escalated, no hold  -> tell nobody again, but hold once the grace passes.
+ *                          No second model call: it already said it cannot
+ *                          answer, and asking twice both costs a call and invites
+ *                          a different verdict (the same ask escalated once and
+ *                          answered once on 2026-09-14).
+ *   nothing yet         -> ask the model
+ */
+export function nextStep(item, priorEvents, now = Date.now()) {
+  const mine = (priorEvents ?? []).filter((e) => e.target === item.id);
+  if (mine.some((e) => e.action === "slack.answer")) {
+    return { step: "skip", why: "already answered" };
+  }
+  const escalations = mine.filter((e) => e.action === "slack.escalate");
+  if (escalations.some((e) => e.payload?.held === true)) {
+    return { step: "skip", why: "already escalated and held" };
+  }
+  if (escalations.length) {
+    return shouldHold(item, now)
+      ? { step: "hold", why: "escalated earlier, grace has now passed" }
+      : { step: "skip", why: "escalated earlier, still inside the grace period" };
+  }
+  return { step: "decide", why: "not looked at yet" };
 }
