@@ -95,12 +95,28 @@ export function shouldHold(item, now = Date.now(), graceMs = 2 * 60 * 60 * 1000)
   return Number.isFinite(age) && age >= graceMs;
 }
 
-/** The holding reply. Signed first, short, and it promises no date. */
+/**
+ * The holding reply.
+ *
+ * IT SAYS ONLY WHAT IS TRUE AT THE MOMENT IT IS SENT. The first version read "Noah
+ * has seen this and does not have the answer to hand", and Noah's objection on
+ * 2026-09-14 was exact: he had not seen it, he was never asked, and so the message
+ * was false and made him look like he had ignored a colleague. Nothing here has any
+ * signal about his attention. The desk gets a Discord notification, and a
+ * notification is not a person reading something; he never acknowledges anything
+ * back to this script.
+ *
+ * So the subject is "I", the assistant, throughout. Three claims, all checkable:
+ * I could not answer it (the verdict), I have put it in front of him (the ops.events
+ * row and the Discord ping), and he will reply (the courtesy Noah asked for, with no
+ * date attached). Nothing about what he has seen, thinks or decided, which
+ * checkOutbound's speaks-for-noah rule now blocks outright.
+ */
 export function holdText(askedBy) {
   const who = (askedBy ?? "").trim().split(/\s+/)[0];
   return signed(
-    `${who ? `Hi ${who}, ` : ""}Noah has seen this and does not have the answer to hand. ` +
-      `He will come back to you on it.`,
+    `${who ? `Hi ${who}, ` : ""}I could not answer this one from what I can check, ` +
+      `so I have put it in front of Noah. He will get back to you on it.`,
   );
 }
 

@@ -99,6 +99,19 @@ test("the holding reply says who is typing BEFORE it says anything else", () => 
   assert.doesNotMatch(t, /tomorrow|today|by \w+day|within/i);
 });
 
+test("the holding reply claims nothing about what Noah has seen or thinks", () => {
+  // The original said "Noah has seen this and does not have the answer to hand".
+  // He had not seen it and was never asked. Nothing here can know either.
+  const t = holdText("Sam Rivera");
+  assert.doesNotMatch(t, /has seen|had seen|has read|was asked|does not have|doesn'?t have/i);
+  // It speaks as the assistant about the assistant.
+  assert.match(t, /I could not answer/);
+  assert.match(t, /I have put it in front of Noah/);
+});
+
+// The send gate itself is TypeScript and is tested in src/lib/desk-rules.test.ts,
+// which runs under tsx. This suite runs on bare node, so it cannot import it.
+
 test("a verdict citing nothing is an escalation, not an answer", () => {
   const v = parseVerdict('{"escalate": false, "answer": "about 400 requests a minute", "sources": []}');
   assert.equal(v.escalate, true);

@@ -163,6 +163,8 @@ ${transcript || "(none)"}
 
 Answer ONLY from what you can actually open and verify right now: this repo, the Supabase ops/hub schemas, the clients/ tree, the Obsidian vault, git history, the Community repos. You are READ-ONLY. Do not write files, do not run anything that changes state.
 
+NEVER say what Noah has seen, read, been asked, thinks, wants, agreed to or decided. You have no way to know any of it: he is sent a notification and he never confirms anything back to you, so a notification is not him reading something. Write about what YOU did instead ("I could not find this", "I have put this in front of Noah"). The send gate blocks the message outright if you claim his attention or his opinion.
+
 Escalate to Noah instead of answering when ANY of these is true:
 - you cannot find the answer in a source you actually read
 - answering means promising a date, a price, a scope or a commitment
