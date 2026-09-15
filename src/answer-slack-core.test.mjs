@@ -99,14 +99,43 @@ test("the holding reply says who is typing BEFORE it says anything else", () => 
   assert.doesNotMatch(t, /tomorrow|today|by \w+day|within/i);
 });
 
-test("the holding reply claims nothing about what Noah has seen or thinks", () => {
+test("every variant reads correctly after the greeting, and there is more than one", () => {
+  const bodies = new Set();
+  for (const seed of "abcdefghijkl") bodies.add(holdText("Sam Rivera", seed).split("\n\n")[1]);
+  assert.ok(bodies.size >= 2, "Noah asked for variety, one phrasing is not variety");
+  for (const b of bodies) {
+    assert.ok(b.startsWith("Hi Sam, I "), `a variant must open on "I" after the greeting: ${b}`);
+    // "Hi Sam, This is..." was the bug: a capital mid-sentence. Lower-casing in
+    // code is not the fix, it would turn "I" into "i".
+    assert.doesNotMatch(b, /^Hi Sam, [A-HJ-Z]/, `capital mid-sentence: ${b}`);
+  }
+});
+
+test("the same ask always gets the same wording, so a retry cannot contradict itself", () => {
+  assert.equal(holdText("Sam", "task-123"), holdText("Sam", "task-123"));
+  // And different asks do actually differ across a handful of ids.
+  const spread = new Set("abcdefgh".split("").map((s) => holdText("Sam", s)));
+  assert.ok(spread.size > 1);
+});
+
+test("NO variant claims anything about what Noah has seen or thinks", () => {
   // The original said "Noah has seen this and does not have the answer to hand".
-  // He had not seen it and was never asked. Nothing here can know either.
-  const t = holdText("Sam Rivera");
-  assert.doesNotMatch(t, /has seen|had seen|has read|was asked|does not have|doesn'?t have/i);
-  // It speaks as the assistant about the assistant.
-  assert.match(t, /I could not answer/);
-  assert.match(t, /I have put it in front of Noah/);
+  // He had not seen it and was never asked, and nothing here can know either. This
+  // asserts the invariant rather than a phrasing, because the phrasing now varies
+  // and a new variant is exactly where this would come back.
+  for (const seed of "abcdefghijkl") {
+    const t = holdText("Sam Rivera", seed);
+    const body = t.split(SIGNATURE).join("");
+    assert.doesNotMatch(
+      body,
+      /\bNoah (?:has|had|is|was|thinks|knows|saw|read|agreed|decided)\b|\bhe (?:has|had|'?s) (?:seen|read|been asked)\b/i,
+      `claims Noah's state: ${body}`,
+    );
+    // Every variant is the assistant talking about itself, and names Noah only as
+    // the person it is escalating TO.
+    assert.match(body, /\bI (?:could not|cannot|do not|am)\b/, `not first person: ${body}`);
+    assert.match(body, /Noah/, `does not say who it is going to: ${body}`);
+  }
 });
 
 // The send gate itself is TypeScript and is tested in src/lib/desk-rules.test.ts,

@@ -112,12 +112,47 @@ export function shouldHold(item, now = Date.now(), graceMs = 2 * 60 * 60 * 1000)
  * date attached). Nothing about what he has seen, thinks or decided, which
  * checkOutbound's speaks-for-noah rule now blocks outright.
  */
-export function holdText(askedBy) {
-  const who = (askedBy ?? "").trim().split(/\s+/)[0];
-  return signed(
-    `${who ? `Hi ${who}, ` : ""}I could not answer this one from what I can check, ` +
-      `so I have put it in front of Noah. He will get back to you on it.`,
-  );
+export const HOLD_VARIANTS = [
+  (who) =>
+    `${who}I could not give a verifiable answer on this one, so it needs Noah. ` +
+    `I am alerting him to it now. Thank you.`,
+  // Every variant starts with "I" on purpose. The greeting is prepended, so a
+  // variant opening on any other word renders as "Hi Sam, This is..." with a
+  // capital mid-sentence, and lower-casing it in code would turn "I" into "i".
+  (who) =>
+    `${who}I cannot verify this one from anything I have access to, so I am passing ` +
+    `it to Noah rather than guessing at it. Raising it with him now.`,
+  (who) =>
+    `${who}I could not confirm an answer to this from anything I can check. ` +
+    `Flagging it to Noah now, and he will come back to you on it.`,
+  (who) =>
+    `${who}I do not have a checkable answer for this one, so I am putting it to ` +
+    `Noah now rather than risk getting it wrong. He will pick it up from here.`,
+];
+
+/**
+ * The holding reply, in one of several phrasings.
+ *
+ * Noah asked for variety so it does not read like the same robot every time. The
+ * choice is made from the ask's own id rather than at random: the same ask always
+ * gets the same wording, so a retry cannot contradict what was already sent, and a
+ * test can assert the selection instead of stubbing a random number generator.
+ *
+ * Every variant says only what is true at the moment of sending: that the assistant
+ * could not verify an answer, and that it is alerting Noah as it speaks. None of
+ * them report what Noah has seen or thinks, which is a false claim nothing here can
+ * check (see the speaks-for-noah rule). desk-rules.test.ts runs every variant
+ * through checkOutbound, so a phrasing that would be refused cannot ship, which
+ * matters because a refused hold means a colleague is left with silence.
+ */
+export function holdText(askedBy, seed = "") {
+  const first = (askedBy ?? "").trim().split(/\s+/)[0];
+  const who = first ? `Hi ${first}, ` : "";
+  // djb2, enough to spread ids evenly and short enough to read.
+  let h = 5381;
+  for (const ch of String(seed)) h = ((h << 5) + h + ch.charCodeAt(0)) | 0;
+  const pick = HOLD_VARIANTS[Math.abs(h) % HOLD_VARIANTS.length];
+  return signed(pick(who));
 }
 
 /**

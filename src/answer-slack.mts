@@ -216,6 +216,36 @@ async function send(addr: { channel: string; threadTs: string }, text: string) {
   if (!r.ok) throw new Error(`slack chat.postMessage: ${r.error}`);
 }
 
+/**
+ * Send the holding reply, THROUGH THE GATE.
+ *
+ * It used to call send(holdText(...)) directly, so the one message shape written
+ * entirely by us was the only one nothing checked, which is exactly how "Noah has
+ * seen this" reached Sam. checkOutbound is given kind:"hold" so it skips the
+ * source requirement (a hold makes no claim) and enforces everything else.
+ *
+ * A refused hold is our template being broken, not the ask being unusual, so it
+ * throws rather than sending something unchecked or quietly sending nothing. The
+ * caller logs it and Noah still gets the Discord ping either way.
+ */
+async function sendHold(addr: { channel: string; threadTs: string }, item: DeskRow) {
+  const text = holdText(item.asked_by, item.id);
+  const rules = checkOutbound({
+    lane: "community",
+    to: item.asked_by ?? "unknown",
+    text,
+    sources: [],
+    kind: "hold",
+  });
+  if (!rules.allowed) {
+    throw new Error(
+      `the holding reply itself was refused (${[...rules.blocked, ...rules.flagged].join(", ")}). ` +
+        `Fix HOLD_VARIANTS in answer-slack-core.mjs; nothing was sent.`,
+    );
+  }
+  await send(addr, text);
+}
+
 async function main() {
   const { data: items, error } = await sb
     .from("tasks")
@@ -296,7 +326,7 @@ async function handle(item: DeskRow, label: string) {
   // call: it already said it cannot answer, and asking again costs a call and
   // invites a different verdict for no gain.
   if (plan.step === "hold") {
-    await send(addr, holdText(item.asked_by));
+    await sendHold(addr, item);
     await insertOpsEvent(sb, {
       actor: "assistant",
       action: "slack.escalate",
@@ -362,7 +392,7 @@ async function handle(item: DeskRow, label: string) {
     console.log(`WOULD ESCALATE  ${label}\n      ${verdict.why}\n      ${hold ? "and would send the holding reply" : "too recent for a holding reply"}\n`);
     return;
   }
-  if (hold) await send(addr, holdText(item.asked_by));
+  if (hold) await sendHold(addr, item);
   await insertOpsEvent(sb, {
     actor: "assistant",
     action: "slack.escalate",
