@@ -95,12 +95,12 @@ export function shouldHold(item, now = Date.now(), graceMs = 2 * 60 * 60 * 1000)
   return Number.isFinite(age) && age >= graceMs;
 }
 
-/** The holding reply. Short, no promise of a time, and it says who is typing. */
+/** The holding reply. Signed first, short, and it promises no date. */
 export function holdText(askedBy) {
   const who = (askedBy ?? "").trim().split(/\s+/)[0];
-  return (
+  return signed(
     `${who ? `Hi ${who}, ` : ""}Noah has seen this and does not have the answer to hand. ` +
-    `He will come back to you on it.\n\n${SIGNATURE}`
+      `He will come back to you on it.`,
   );
 }
 
@@ -138,9 +138,21 @@ export function parseVerdict(raw) {
   return { escalate: false, answer, sources, why: String(v.why ?? "") };
 }
 
-/** Append the signature if the model forgot it. checkOutbound blocks without it. */
+/**
+ * Put the signature FIRST, then a blank line, then the message.
+ *
+ * Noah's call, 2026-09-14: a reader must know it is Claude before they read a word
+ * of it, not after. A sign-off at the bottom is only honest to someone who reaches
+ * the bottom, and on a phone a long reply is read as Noah's until the last line
+ * disproves it.
+ *
+ * Any signature the model put in the body is stripped first, so this cannot end up
+ * saying it twice. checkOutbound blocks a message without it, so it is never
+ * decoration.
+ */
 export function signed(answer) {
-  return answer.includes(SIGNATURE) ? answer : `${answer.trimEnd()}\n\n${SIGNATURE}`;
+  const body = String(answer).split(SIGNATURE).join("").trim();
+  return `${SIGNATURE}\n\n${body}`;
 }
 
 /**

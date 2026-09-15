@@ -89,14 +89,30 @@ type DeskRow = {
   notes: string | null;
 };
 
+/**
+ * Call the Slack Web API.
+ *
+ * READ METHODS MUST BE FORM-ENCODED. chat.postMessage accepts a JSON body, most
+ * of the rest do not: conversations.replies answers a JSON body with
+ * `invalid_arguments` and no explanation. Sending JSON to everything is what made
+ * threadOf() return an empty array on every single call from the day it was
+ * written, which silently cost three things at once, the model getting the real
+ * message instead of the 155-char desk title, the "someone already replied" guard,
+ * and knowing who asked. Verified against the live workspace 2026-09-14.
+ */
 async function slack(method: string, params: Record<string, unknown>) {
+  const json = method.startsWith("chat.");
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${slackToken}`,
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": json
+        ? "application/json; charset=utf-8"
+        : "application/x-www-form-urlencoded; charset=utf-8",
     },
-    body: JSON.stringify(params),
+    body: json
+      ? JSON.stringify(params)
+      : new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])),
   });
   return (await res.json()) as { ok: boolean; error?: string; messages?: SlackMsg[] };
 }
@@ -108,11 +124,18 @@ async function threadOf(addr: { channel: string; threadTs: string }) {
     ts: addr.threadTs,
     limit: 40,
   });
-  // A plain channel message that was never threaded returns not_found or a single
-  // message; either way an empty thread is a valid state, not a failure.
+  // ONLY "this message has no thread" is an empty thread. Everything else is a
+  // fault and has to be loud.
+  //
+  // This used to `return []` for any error at all, which is how a content-type bug
+  // hid for the life of the script: every call failed with `invalid_arguments`,
+  // every call looked like a message nobody had replied to, and the downstream code
+  // degraded quietly into using the truncated desk title. A catch-all that returns
+  // a valid-looking empty value cannot be debugged from its output, which is the
+  // same "healthy-looking empty state" hub-preflight.mjs exists to catch.
   if (!r.ok) {
-    if (r.error === "missing_scope") throw new Error(`slack: missing_scope on conversations.replies`);
-    return [];
+    if (r.error === "thread_not_found") return [];
+    throw new Error(`slack conversations.replies: ${r.error ?? "unknown error"}`);
   }
   return r.messages ?? [];
 }

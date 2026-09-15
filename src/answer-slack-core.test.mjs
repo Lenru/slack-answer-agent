@@ -90,10 +90,12 @@ test("a holding reply waits two hours, so it never lands while Noah is reading",
   assert.equal(shouldHold({ created_at: "2026-09-14T09:00:00Z" }, now), true);
 });
 
-test("the holding reply names them, promises no date, and says who is typing", () => {
+test("the holding reply says who is typing BEFORE it says anything else", () => {
   const t = holdText("Sam Rivera");
-  assert.match(t, /^Hi Sam,/);
-  assert.ok(t.includes(SIGNATURE));
+  // Noah, 2026-09-14: the reader must know it is Claude before the first word of
+  // the message, not after the last one.
+  assert.ok(t.startsWith(SIGNATURE + "\n\n"));
+  assert.match(t, /\n\nHi Sam, /);
   assert.doesNotMatch(t, /tomorrow|today|by \w+day|within/i);
 });
 
@@ -119,10 +121,13 @@ test("junk, empty answers and a bare escalation all land as escalations", () => 
   assert.equal(parseVerdict('{"escalate": true, "why": "need Noah"}').escalate, true);
 });
 
-test("the signature is added once and never twice", () => {
-  assert.ok(signed("hello").endsWith(SIGNATURE));
-  const once = signed(`hello\n\n${SIGNATURE}`);
-  assert.equal(once.split(SIGNATURE).length - 1, 1);
+test("the signature leads, once, even when the model already signed the body", () => {
+  assert.equal(signed("hello"), `${SIGNATURE}\n\nhello`);
+  // A model that signs off at the bottom must not leave it in both places, and the
+  // body must survive intact.
+  const moved = signed(`hello\n\n${SIGNATURE}`);
+  assert.equal(moved.split(SIGNATURE).length - 1, 1);
+  assert.equal(moved, `${SIGNATURE}\n\nhello`);
 });
 
 // The hourly-heartbeat trap: an ask seen while still too recent to hold must not
