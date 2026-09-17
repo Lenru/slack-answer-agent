@@ -244,3 +244,31 @@ export function nextStep(item, priorEvents, now = Date.now()) {
   }
   return { step: "decide", why: "not looked at yet" };
 }
+
+/**
+ * Is Noah around to answer this himself?
+ *
+ * Noah, 2026-09-17: "if I'm up and online you should wait to send a message to
+ * someone." When he is online the people asking should hear from him, not from an
+ * assistant speaking for him while he sits right there.
+ *
+ * The signal is Slack's own presence, from users.getPresence on his user token
+ * (users:read, already granted). It is the same green dot the colleague sees, so
+ * "online" means exactly what they would assume it means.
+ *
+ * ONLY an explicit "away" lets the assistant speak. Active waits, and so does
+ * anything unreadable: a failed call, a missing field, a changed API. Staying
+ * quiet when we cannot tell is recoverable, since the next hourly pass asks again;
+ * speaking for him while he is online is the thing he just asked us not to do.
+ * Nothing is logged to ops.events on a wait, so nextStep() sees the ask as
+ * untouched and the first pass after he goes away handles it normally.
+ */
+export function waitForNoah(presence) {
+  if (!presence || presence.ok !== true) {
+    return { wait: true, why: `could not read Noah's Slack presence (${presence?.error ?? "no response"}), so not speaking for him` };
+  }
+  if (presence.presence === "away") {
+    return { wait: false, why: presence.manual_away ? "Noah set himself away" : "Noah is away on Slack" };
+  }
+  return { wait: true, why: `Noah is ${presence.presence ?? "in an unknown state"} on Slack, leaving it to him` };
+}

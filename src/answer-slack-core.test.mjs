@@ -9,7 +9,28 @@ import {
   nextStep,
   shouldHold,
   signed,
+  waitForNoah,
 } from "./answer-slack-core.mjs";
+
+// Noah, 2026-09-17: if he is up and online, the assistant waits and he answers.
+test("Noah online: the assistant waits", () => {
+  // The exact shape users.getPresence returned for his token that day.
+  const live = { ok: true, presence: "active", online: true, auto_away: false, manual_away: false, connection_count: 2 };
+  assert.equal(waitForNoah(live).wait, true);
+});
+
+test("Noah away, automatically or by his own choice: the assistant may answer", () => {
+  assert.equal(waitForNoah({ ok: true, presence: "away", auto_away: true }).wait, false);
+  assert.equal(waitForNoah({ ok: true, presence: "away", manual_away: true }).wait, false);
+});
+
+test("presence we cannot read means wait, never speak for him blind", () => {
+  // Silence is recoverable on the next hourly pass; speaking for him while he is
+  // online is exactly what he asked us not to do.
+  for (const p of [null, undefined, { ok: false, error: "ratelimited" }, { ok: true }, { ok: true, presence: "busy" }]) {
+    assert.equal(waitForNoah(p).wait, true, JSON.stringify(p));
+  }
+});
 
 const REAL = "https://example.slack.com/archives/C00000000A1/p1789135985621399";
 

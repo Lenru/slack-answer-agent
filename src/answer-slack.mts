@@ -51,6 +51,7 @@ import {
   parseVerdict,
   shouldHold,
   signed,
+  waitForNoah,
 } from "./answer-slack-core.mjs";
 
 const DRY = process.argv.includes("--dry");
@@ -262,6 +263,20 @@ async function main() {
     console.log("nothing waiting.");
     return;
   }
+
+  // If Noah is online, he answers his own people (his call, 2026-09-17). Checked
+  // once per run, before any model call, and only when something is waiting, so a
+  // quiet hour costs no Slack call at all. No user param: getPresence defaults to
+  // the token's owner, which is Noah, so no id is hard-coded here.
+  // Nothing is written on a wait, so the next pass after he goes away treats every
+  // ask as untouched.
+  const presence = await slack("users.getPresence", {});
+  const around = waitForNoah(presence);
+  if (around.wait) {
+    console.log(`WAITING  ${around.why}. ${items.length} ask(s) left for him.`);
+    return;
+  }
+  console.log(`${around.why}, so the assistant may answer.\n`);
 
   // What we have already answered or escalated, so a heartbeat does not re-ping
   // Noah about Sam every two hours and never sends a second reply. ops.events is
