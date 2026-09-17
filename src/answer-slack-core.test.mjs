@@ -10,7 +10,31 @@ import {
   shouldHold,
   signed,
   waitForNoah,
+  ANSWER_DEADLINE_MS,
 } from "./answer-slack-core.mjs";
+
+// Noah, 2026-09-17: a computer left on shows him online while he is not there. The
+// deadline covers that without guessing from presence at all.
+test("online but unanswered past the deadline: the assistant acts anyway", () => {
+  const now = Date.parse("2026-09-17T12:00:00Z");
+  const old = { created_at: "2026-09-17T09:30:00Z" };
+  assert.equal(waitForNoah({ ok: true, presence: "active" }, old, now).wait, false);
+  // Unreadable presence does not hold an old ask back either: nobody answered.
+  assert.equal(waitForNoah({ ok: false, error: "ratelimited" }, old, now).wait, false);
+});
+
+test("online and still inside the deadline: it waits for him", () => {
+  const now = Date.parse("2026-09-17T12:00:00Z");
+  assert.equal(waitForNoah({ ok: true, presence: "active" }, { created_at: "2026-09-17T11:30:00Z" }, now).wait, true);
+});
+
+test("the deadline lines up with the holding-reply grace", () => {
+  // An ask ignored while "online" gets its answer or holding reply in one pass.
+  const ask = { created_at: "2026-09-17T09:00:00Z" };
+  const now = Date.parse(ask.created_at) + ANSWER_DEADLINE_MS;
+  assert.equal(waitForNoah({ ok: true, presence: "active" }, ask, now).wait, false);
+  assert.equal(shouldHold(ask, now), true);
+});
 
 // Noah, 2026-09-17: if he is up and online, the assistant waits and he answers.
 test("Noah online: the assistant waits", () => {

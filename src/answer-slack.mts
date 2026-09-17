@@ -81,6 +81,9 @@ type SlackMsg = { ts: string; user?: string; text?: string; bot_id?: string };
 type PriorEvent = { target: string; action: string; payload: { held?: boolean } | null };
 const PRIOR: PriorEvent[] = [];
 
+/** Noah's Slack presence for this run, read once in main(). waitForNoah() reads it. */
+let PRESENCE: unknown = null;
+
 type DeskRow = {
   id: string;
   title: string;
@@ -264,19 +267,11 @@ async function main() {
     return;
   }
 
-  // If Noah is online, he answers his own people (his call, 2026-09-17). Checked
-  // once per run, before any model call, and only when something is waiting, so a
-  // quiet hour costs no Slack call at all. No user param: getPresence defaults to
-  // the token's owner, which is Noah, so no id is hard-coded here.
-  // Nothing is written on a wait, so the next pass after he goes away treats every
-  // ask as untouched.
-  const presence = await slack("users.getPresence", {});
-  const around = waitForNoah(presence);
-  if (around.wait) {
-    console.log(`WAITING  ${around.why}. ${items.length} ask(s) left for him.`);
-    return;
-  }
-  console.log(`${around.why}, so the assistant may answer.\n`);
+  // If Noah is online, he answers his own people (his call, 2026-09-17), unless an
+  // ask has gone unanswered past ANSWER_DEADLINE_MS. Read once per run, only when
+  // something is waiting, and applied per ask in handle(), because the deadline is
+  // per ask. No user param: getPresence defaults to the token's owner, Noah.
+  PRESENCE = await slack("users.getPresence", {});
 
   // What we have already answered or escalated, so a heartbeat does not re-ping
   // Noah about Sam every two hours and never sends a second reply. ops.events is
@@ -327,6 +322,15 @@ async function handle(item: DeskRow, label: string) {
   const plan = nextStep(item, PRIOR);
   if (plan.step === "skip") {
     console.log(`SKIP  ${label}\n      ${plan.why}\n`);
+    return;
+  }
+
+  // Leave it to Noah while he is online and the ask is still inside its deadline.
+  // Before the thread fetch and the model call, so waiting costs nothing, and
+  // nothing is logged, so a later pass sees the ask exactly as it is now.
+  const around = waitForNoah(PRESENCE, item);
+  if (around.wait) {
+    console.log(`WAIT  ${label}\n      ${around.why}\n`);
     return;
   }
 

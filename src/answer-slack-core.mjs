@@ -263,7 +263,32 @@ export function nextStep(item, priorEvents, now = Date.now()) {
  * Nothing is logged to ops.events on a wait, so nextStep() sees the ask as
  * untouched and the first pass after he goes away handles it normally.
  */
-export function waitForNoah(presence) {
+/**
+ * How long an ask waits for Noah before the assistant acts anyway, online or not.
+ *
+ * Noah, 2026-09-17: "what if I left my computer on so that it says that I'm online
+ * on Slack but I'm actually away and I'm not seeing the message." Measured the same
+ * minute: presence "active", last Slack activity 12 minutes old, while he was at his
+ * desk working in another app. The green dot says the app is open, not that he has
+ * seen anything, and last_activity is no better a signal (it would have called him
+ * away while he sat there). Time without a reply is the one thing always true, so
+ * the deadline overrides presence entirely, unreadable presence included.
+ *
+ * Two hours, matching the holding-reply grace in shouldHold(), so an ask he ignores
+ * while "online" gets its answer or its holding reply in the same pass. eligible()
+ * has already checked the thread for a reply by then, so an ask he did answer never
+ * reaches this. Change the number here; nothing else depends on it.
+ */
+export const ANSWER_DEADLINE_MS = 2 * 60 * 60 * 1000;
+
+export function waitForNoah(presence, item, now = Date.now(), deadlineMs = ANSWER_DEADLINE_MS) {
+  const age = now - new Date(item?.created_at).getTime();
+  if (Number.isFinite(age) && age >= deadlineMs) {
+    return {
+      wait: false,
+      why: `no reply after ${(age / 3_600_000).toFixed(1)}h, past the ${deadlineMs / 3_600_000}h deadline, so not waiting on his Slack status`,
+    };
+  }
   if (!presence || presence.ok !== true) {
     return { wait: true, why: `could not read Noah's Slack presence (${presence?.error ?? "no response"}), so not speaking for him` };
   }
