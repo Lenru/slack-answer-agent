@@ -8,8 +8,9 @@
 // as a promise. That limit lives in gate(), below, and is the reason this file
 // is separate from the orchestrator.
 
-/** Every message opens with this, so a reader can tell a session from Noah. */
-export const SIGNATURE = "(Claude on behalf of Noah Watson):";
+/** Every message opens with this, so a reader can tell a session from Noah.
+ *  WatsonsAI, not Claude: Noah's byline everywhere else in #agents (01/10/26). */
+export const SIGNATURE = "(WatsonsAI on behalf of Noah Watson):";
 
 /**
  * Is this message one we should be deciding about?

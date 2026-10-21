@@ -43,8 +43,19 @@ import { createClient } from "@supabase/supabase-js";
 import { checkOutbound } from "../src/lib/desk-rules";
 import { insertOpsEvent } from "./events.mjs";
 import { notifyDiscord } from "./notify.mjs";
+
+// Every `claude -p` this process spawns must run on Noah's SUBSCRIPTION, not on
+// the API. These entry points are started with `node --env-file=.env.local`, which
+// loads ANTHROPIC_API_KEY (the hub's Ask needs it, nothing here does), and a
+// spawned claude.exe inherits it and bills the API: $2 to $4 per headless session.
+// That is what emptied the $5 API limit on 2026-09-25 in about two days. Deleting
+// it here covers every spawn in this process, children included.
+delete process.env.ANTHROPIC_API_KEY;
+// Headless: skip Noah's CLAUDE.md files (rules for live chats, ~44k tokens a call). Auth, MCP, tools unaffected.
+process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
 import {
   addressOf,
+  channelAllowed,
   eligible,
   holdText,
   nextStep,
@@ -208,6 +219,8 @@ A source must be something you opened. An empty sources list means you guessed, 
 }
 
 async function send(addr: { channel: string; threadTs: string }, text: string) {
+  // Second check at the send boundary, so no future code path can post elsewhere.
+  if (!channelAllowed(addr)) throw new Error(`refused to post to ${addr.channel}: not an allowed channel`);
   if (NO_SEND) {
     console.log(`      [--no-send] would have posted to ${addr.channel}`);
     return;
@@ -317,6 +330,11 @@ async function handle(item: DeskRow, label: string) {
     console.log(`SKIP  ${label}\n      no usable slack address\n`);
     return;
   }
+  // Nothing is logged, so the ask stays on the desk for Noah to answer by hand.
+  if (!channelAllowed(addr)) {
+    console.log(`SKIP  ${label}\n      ${addr.channel} is not an allowed channel\n`);
+    return;
+  }
 
   // Decided before any network or model spend, from what we already did to it.
   const plan = nextStep(item, PRIOR);
@@ -424,6 +442,7 @@ async function handle(item: DeskRow, label: string) {
     `[DESK] ${item.asked_by ?? "Someone"} needs you: ${String(item.title).slice(0, 180)}\n` +
       `Could not answer it: ${verdict.why}\n` +
       `${hold ? "Told them you would come back to them. " : ""}${item.source_url ?? ""}`,
+    process.env.DISCORD_COMMUNITY_SLACK_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL,
   );
   console.log(`ESCALATED  ${label}\n      ${verdict.why}${hold ? "  (held)" : ""}\n`);
 }

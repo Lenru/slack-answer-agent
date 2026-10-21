@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   SIGNATURE,
   addressOf,
+  channelAllowed,
   eligible,
   holdText,
   parseVerdict,
@@ -122,6 +123,16 @@ test("a clean ask with nobody replying is eligible", () => {
   const got = eligible(item, []);
   assert.equal(got.ok, true);
   assert.equal(got.addr.channel, "C00000000A1");
+});
+
+test("only #agents and #releases may be posted in", () => {
+  const at = (ch) => addressOf(`https://x.slack.com/archives/${ch}/p1789135985621399`);
+  assert.equal(channelAllowed(at("C00000000A2")), true);
+  assert.equal(channelAllowed(at("C00000000A3")), true);
+  // Jordan's DM and an ordinary channel.
+  assert.equal(channelAllowed(at("D00000000A4")), false);
+  assert.equal(channelAllowed(at("C00000000A1")), false);
+  assert.equal(channelAllowed(null), false);
 });
 
 test("the clinic lane never gets answered from here", () => {

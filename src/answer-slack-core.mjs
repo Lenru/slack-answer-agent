@@ -44,6 +44,22 @@ export function addressOf(permalink) {
 }
 
 /**
+ * The only conversations this may post in, BY ID (channels here get renamed).
+ *
+ * Noah, 2026-10-03: stop messaging Jordan and Sam, answer only in the two
+ * channels the SOP lets sessions talk in. Everything else, DMs included, is
+ * skipped before any model call. IDs match agents.py and register.py.
+ */
+export const ALLOWED_CHANNELS = new Map([
+  ["C00000000A2", "#agents"],
+  ["C00000000A3", "#releases"],
+]);
+
+export function channelAllowed(addr) {
+  return !!addr && ALLOWED_CHANNELS.has(addr.channel);
+}
+
+/**
  * Is this ask worth spending a model call and a message on?
  *
  * Four refusals, and each one is a real row that exists today:

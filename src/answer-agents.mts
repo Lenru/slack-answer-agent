@@ -30,6 +30,16 @@ import { notifyDiscord } from "./notify.mjs";
 import { insertOpsEvent } from "./events.mjs";
 import { SIGNATURE, gate, isCandidate } from "./answer-agents-core.mjs";
 
+// Every `claude -p` this process spawns must run on Noah's SUBSCRIPTION, not on
+// the API. These entry points are started with `node --env-file=.env.local`, which
+// loads ANTHROPIC_API_KEY (the hub's Ask needs it, nothing here does), and a
+// spawned claude.exe inherits it and bills the API: $2 to $4 per headless session.
+// That is what emptied the $5 API limit on 2026-09-25 in about two days. Deleting
+// it here covers every spawn in this process, children included.
+delete process.env.ANTHROPIC_API_KEY;
+// Headless: skip Noah's CLAUDE.md files (rules for live chats, ~44k tokens a call). Auth, MCP, tools unaffected.
+process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
+
 const NO_SEND = process.argv.includes("--no-send");
 const CHANNEL = "C00000000A2"; // #agents, BY ID: agents.py notes a channel in
                                // this workspace was renamed twice in one morning.
@@ -264,7 +274,7 @@ async function main() {
   if (v.for_noah) {
     console.log(`-> Noah pinged: ${v.for_noah}`);
     await notifyDiscord(`#agents needs YOU, not the session:
-${v.for_noah}`, undefined, { mention: true });
+${v.for_noah}`, process.env.DISCORD_COMMUNITY_SLACK_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL, { mention: true });
     await log(run, "agents.flag", "blocked", v.for_noah, { text: v.for_noah });
   } else {
     console.log("-> nothing flagged to Noah");
@@ -285,7 +295,7 @@ ${v.for_noah}`, undefined, { mention: true });
     await log(run, "agents.hold", "blocked", g.why ?? "held", { text: v.text ?? "", commits: Boolean(v.commits) });
     await notifyDiscord(
       `#agents: a reply was held (${g.why}). ${v.for_noah ?? v.why ?? ""}\n\nIt wanted to say:\n${(v.text ?? "").slice(0, 900)}`,
-      undefined,
+      process.env.DISCORD_COMMUNITY_SLACK_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL,
       { mention: true },
     );
     remember(newest);
