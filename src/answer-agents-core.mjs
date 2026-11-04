@@ -1,4 +1,4 @@
-import { SECRET_PATTERN } from "./outbound-rules.mjs";
+import { containsSecret } from "./outbound-rules.mjs";
 
 // The decisions behind answering the shared agents channel, with no IO in
 // them, so they can be tested without Slack or a model.
@@ -49,7 +49,7 @@ export function gate(text, commits) {
   // The channel's own posting script refused anything shorter, as not worth a
   // channel everyone reads.
   if (body.length < 15) return { ok: false, why: "too short for a channel everyone reads" };
-  if (SECRET_PATTERN.test(body)) return { ok: false, why: "contains something shaped like a credential" };
+  if (containsSecret(body)) return { ok: false, why: "contains something shaped like a credential" };
   if (commits) return { ok: false, why: "the model declared this commits Noah's side" };
 
   const takesWork =

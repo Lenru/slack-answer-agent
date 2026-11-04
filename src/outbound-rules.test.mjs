@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkOutbound } from "./outbound-rules.mjs";
+import { checkOutbound, containsSecret } from "./outbound-rules.mjs";
 import { HOLD_VARIANTS, holdText, signed } from "./answer-slack-core.mjs";
 
 const answer = (text, sources = ["docs/limits.md"]) => checkOutbound({ lane: "work", to: "Sam", text: signed(text), sources });
@@ -65,5 +65,32 @@ test("a reply quoting anything shaped like a credential is blocked, however it g
   ]) {
     const r = checkOutbound({ text: signed(`Here you go: ${leak}`), lane: "community", sources: ["docs/faq.md"] });
     assert.ok(r.blocked.includes("secret"), leak);
+  }
+});
+
+test("credentials in other shapes are blocked too", () => {
+  for (const leak of [
+    'api_key: "abc123def456ghi789"',
+    "db_password = hunter2hunter2hunter2",
+    "postgres://admin:s3cretpw@db.example.com/app",
+    "github_pat_11ABCDEFG0123456789_abcdefghijklmnop",
+    "AIzaSyA1234567890abcdefghijklmnopqrstu",
+  ]) {
+    assert.ok(containsSecret(`Here you go: ${leak}`), leak);
+  }
+});
+
+test("one of this process's own secrets is blocked whatever its format", () => {
+  process.env.TEST_ONLY_WEBHOOK_URL = "plain words but long enough to match";
+  try {
+    assert.ok(containsSecret("it says plain words but long enough to match, apparently"));
+  } finally {
+    delete process.env.TEST_ONLY_WEBHOOK_URL;
+  }
+});
+
+test("ordinary prose about keys and tokens still gets through", () => {
+  for (const ok of ["The key: remember to rotate it every quarter.", "Your token expires at midnight.", "See https://example.com/docs for details."]) {
+    assert.equal(containsSecret(ok), false, ok);
   }
 });

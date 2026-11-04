@@ -29,7 +29,7 @@ The model writes the reply. Plain, tested code decides whether that reply is eve
 | **The agents assistant may answer, never commit.** | Accepting a task, claiming a ticket or promising a date puts real hours on my plate. The model declares `commits`, and a phrase backstop catches the times it writes "happy to take that on" and doesn't flag it. |
 | **Anything it can't answer still reaches me.** | On its first real run it read five messages, correctly decided each needed a commitment it couldn't make, went silent, and told nobody. Escalation is now checked on `for_noah` alone, never on `commits`. |
 | **Read-only model.** | The CLI call runs with `--tools Read,Grep,Glob`, so the model can open files to cite them and can't change anything. |
-| **Nothing shaped like a secret leaves.** | Slack text is untrusted and the model can read files, so a crafted message could ask it to quote a key. Both send gates block any reply containing a token, private key, webhook URL or `SOMETHING_KEY=` line, whatever the prompt said. |
+| **Nothing shaped like a secret leaves.** | Slack text is untrusted and the model can read files, so a crafted message could ask it to quote a key. Both send gates block any reply containing a known token format, a private key, a webhook, a `password:`-style line or a URL with a password in it. They also block any reply containing one of the bot's own secret values, in whatever format, because no list of patterns is ever complete. |
 
 ## Run the demo
 

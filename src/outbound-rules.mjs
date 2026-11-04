@@ -18,9 +18,30 @@ import { SIGNATURE } from "./answer-slack-core.mjs";
  * open files to cite them, so a crafted message could ask it to quote a key or a
  * .env line back into the channel. Blocked at the exit, whatever the prompt said:
  * this check does not depend on the model behaving.
+ *
+ * Two layers. The patterns catch well-known token formats and `name = value`
+ * lines. The env check catches this process's own secrets in ANY format, which
+ * is the one a pattern list can never be complete about.
  */
-export const SECRET_PATTERN =
-  /(xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|(discord(app)?\.com\/api\/webhooks|hooks\.slack\.com\/services)\/\S+|\b[A-Z][A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)\s*=\s*\S{8,})/;
+const TOKEN_PATTERN =
+  /(xox[abposre]-[A-Za-z0-9-]{10,}|xapp-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|[sr]k_live_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|(discord(app)?\.com\/api\/webhooks|hooks\.slack\.com\/services)\/\S+)/;
+// `api_key: "..."`, `DB_PASSWORD=...`, any case, `:` or `=`, optional quotes. The
+// value must hold a digit, so prose like "the key: remember to rotate" passes.
+const ASSIGNMENT_PATTERN =
+  /[\w.-]*(key|token|secret|passw(or)?d|pwd|credential|dsn)[\w.-]*["']?\s*[:=]\s*["']?(?=[^\s"']*\d)[^\s"']{12,}/i;
+// scheme://user:password@host
+const URL_CREDENTIAL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^\s:@\/]+:[^\s@\/]+@/i;
+const SECRET_ENV_NAME = /key|token|secret|pass|pwd|credential|dsn|webhook/i;
+
+/** Does this text contain a credential, by format or by being one of ours? */
+export function containsSecret(text) {
+  const s = String(text ?? "");
+  if (TOKEN_PATTERN.test(s) || ASSIGNMENT_PATTERN.test(s) || URL_CREDENTIAL_PATTERN.test(s)) return true;
+  // Read at call time, not import time: the runners load .env after importing this.
+  return Object.entries(process.env).some(
+    ([name, value]) => SECRET_ENV_NAME.test(name) && value && value.length >= 12 && s.includes(value),
+  );
+}
 
 /** Lanes the assistant must never message, however the request is phrased. */
 export const FORBIDDEN_LANES = ["clinic"];
@@ -89,7 +110,7 @@ export function checkOutbound(m) {
   // otherwise trip the patterns on every single message.
   const body = m.text.split(SIGNATURE).join("");
   if (SPEAKS_FOR_NOAH_PATTERNS.some((r) => r.test(body))) blocked.push("speaks-for-noah");
-  if (SECRET_PATTERN.test(m.text)) blocked.push("secret");
+  if (containsSecret(m.text)) blocked.push("secret");
   if (FORBIDDEN_LANES.includes(m.lane.toLowerCase())) blocked.push("forbidden-lane");
   // Nothing to cite means nothing to check means it was guessed. A hold makes no
   // claim to check, so this is the one rule it is exempt from.
