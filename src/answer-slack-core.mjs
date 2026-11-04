@@ -6,9 +6,9 @@
 // notify him. This file decides WHICH asks are worth a model call, how to read a
 // Slack permalink back into a thread address, and whether a model's reply is
 // usable. What may be SENT is not decided here: that is checkOutbound() in
-// src/lib/desk-rules.ts, which already existed and is the send boundary.
+// outbound-rules.mjs, which already existed and is the send boundary.
 
-/** How the assistant always signs off. Must match ASSISTANT_SIGNATURE. */
+/** How the assistant always identifies itself. checkOutbound() blocks a message without it. */
 export const SIGNATURE = "Claude, answering on Noah's behalf";
 
 /**
@@ -48,32 +48,33 @@ export function addressOf(permalink) {
  *
  * Noah, 2026-10-03: stop messaging Jordan and Sam, answer only in the two
  * channels the SOP lets sessions talk in. Everything else, DMs included, is
- * skipped before any model call. IDs match agents.py and register.py.
+ * skipped before any model call. The IDs here are placeholders; the runner can pass
+ * its own set.
  */
 export const ALLOWED_CHANNELS = new Map([
   ["C00000000A2", "#agents"],
   ["C00000000A3", "#releases"],
 ]);
 
-export function channelAllowed(addr) {
-  return !!addr && ALLOWED_CHANNELS.has(addr.channel);
+export function channelAllowed(addr, allowed = ALLOWED_CHANNELS) {
+  return !!addr && allowed.has(addr.channel);
 }
 
 /**
  * Is this ask worth spending a model call and a message on?
  *
- * Four refusals, and each one is a real row that exists today:
+ * Three refusals, and each one is a real row that exists today:
  *
  *  - No address. The two seeded 2026-09-09 rows point at a fake channel and at
  *    the desk itself. Posting into DPREFLIGHT would be posting into nothing.
  *  - Someone already replied after the ask. Noah answers by hand constantly, and
  *    the sender must never talk over him. This is checked against the live thread
  *    rather than against a flag, because the flag would be the thing that is stale.
- *  - The Clinic lane. FORBIDDEN_LANES in desk-rules, enforced again at the send
- *    boundary. the client is not on this path at all.
+ *  - The Clinic lane. FORBIDDEN_LANES in outbound-rules.mjs, enforced again at the send
+ *    boundary. That client is not on this path at all.
  */
 export function eligible(item, thread) {
-  if (/\bclinic\b|\bclient\b/i.test(`${item.title ?? ""} ${item.asked_by ?? ""}`)) {
+  if (/\bclinic\b/i.test(`${item.title ?? ""} ${item.asked_by ?? ""}`)) {
     return { ok: false, why: "clinic lane, never answered from here" };
   }
 
@@ -123,7 +124,7 @@ export function shouldHold(item, now = Date.now(), graceMs = 2 * 60 * 60 * 1000)
  * back to this script.
  *
  * So the subject is "I", the assistant, throughout. Three claims, all checkable:
- * I could not answer it (the verdict), I have put it in front of him (the ops.events
+ * I could not answer it (the verdict), I have put it in front of him (the event log
  * row and the Discord ping), and he will reply (the courtesy Noah asked for, with no
  * date attached). Nothing about what he has seen, thinks or decided, which
  * checkOutbound's speaks-for-noah rule now blocks outright.
@@ -157,7 +158,7 @@ export const HOLD_VARIANTS = [
  * Every variant says only what is true at the moment of sending: that the assistant
  * could not verify an answer, and that it is alerting Noah as it speaks. None of
  * them report what Noah has seen or thinks, which is a false claim nothing here can
- * check (see the speaks-for-noah rule). desk-rules.test.ts runs every variant
+ * check (see the speaks-for-noah rule). outbound-rules.test.mjs runs every variant
  * through checkOutbound, so a phrasing that would be refused cannot ship, which
  * matters because a refused hold means a colleague is left with silence.
  */
@@ -276,7 +277,7 @@ export function nextStep(item, priorEvents, now = Date.now()) {
  * anything unreadable: a failed call, a missing field, a changed API. Staying
  * quiet when we cannot tell is recoverable, since the next hourly pass asks again;
  * speaking for him while he is online is the thing he just asked us not to do.
- * Nothing is logged to ops.events on a wait, so nextStep() sees the ask as
+ * Nothing is logged to the event log on a wait, so nextStep() sees the ask as
  * untouched and the first pass after he goes away handles it normally.
  */
 /**

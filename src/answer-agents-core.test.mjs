@@ -59,7 +59,7 @@ test("gate refuses text that speaks for Noah", () => {
 });
 
 test("gate refuses a message too short for the channel", () => {
-  // agents.py rejects these anyway; failing here means Noah hears about it.
+  // The channel's posting script rejects these anyway; failing here means Noah hears about it.
   assert.equal(gate("ack", false).ok, false);
   assert.equal(gate("", false).ok, false);
 });

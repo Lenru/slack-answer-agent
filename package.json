@@ -1,0 +1,12 @@
+{
+  "name": "slack-answer-agent",
+  "version": "1.0.0",
+  "description": "A Claude assistant that answers Slack on its owner's behalf, with guardrails on when it may speak and what it may say.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node src/demo.mjs"
+  }
+}

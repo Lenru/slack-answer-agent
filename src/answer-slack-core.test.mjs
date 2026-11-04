@@ -194,8 +194,7 @@ test("NO variant claims anything about what Noah has seen or thinks", () => {
   }
 });
 
-// The send gate itself is TypeScript and is tested in src/lib/desk-rules.test.ts,
-// which runs under tsx. This suite runs on bare node, so it cannot import it.
+// The send gate itself is tested in outbound-rules.test.mjs.
 
 test("a verdict citing nothing is an escalation, not an answer", () => {
   const v = parseVerdict('{"escalate": false, "answer": "about 400 requests a minute", "sources": []}');

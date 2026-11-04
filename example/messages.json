@@ -1,0 +1,141 @@
+{
+  "_about": "Fictional workspace. Each ask carries the verdict a model returned, so the demo runs the real decision code with no Slack token and no model. People, channels and tickets are made up.",
+  "now": "2026-09-17T12:00:00Z",
+  "slack": {
+    "presence": { "ok": true, "presence": "active", "online": true, "auto_away": false, "manual_away": false },
+    "events": [
+      { "target": "ask-9", "action": "slack.escalate", "payload": { "held": false } }
+    ],
+    "asks": [
+      {
+        "id": "ask-1",
+        "title": "what is the API rate limit on staging?",
+        "asked_by": "Sam Rivera",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000100",
+        "thread": [
+          { "ts": "1789635600.000100", "user": "USAM", "text": "what is the API rate limit on staging? the load test keeps getting 429s and I want to know if that's expected or a bug" }
+        ],
+        "model": { "escalate": false, "answer": "Staging is capped at 600 requests a minute per key, so 429s above that are expected. The cap is set in config/limits.json.", "sources": ["config/limits.json"], "why": "read the limits file" }
+      },
+      {
+        "id": "ask-2",
+        "title": "is the release branch cut yet?",
+        "asked_by": "Jordan Lee",
+        "created_at": "2026-09-17T11:30:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789644600000100",
+        "thread": [{ "ts": "1789644600.000100", "user": "UJORDAN", "text": "is the release branch cut yet?" }],
+        "model": { "escalate": false, "answer": "Not reached: Noah is online and this ask is 30 minutes old.", "sources": ["n/a"] }
+      },
+      {
+        "id": "ask-3",
+        "title": "can we roll the new onboarding flow out to everyone?",
+        "asked_by": "Sam Rivera",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000300",
+        "thread": [{ "ts": "1789635600.000300", "user": "USAM", "text": "can we roll the new onboarding flow out to everyone?" }],
+        "model": { "escalate": false, "answer": "Noah has already seen the rollout plan and approved it, so go ahead.", "sources": ["docs/rollout.md"], "why": "rollout doc exists" }
+      },
+      {
+        "id": "ask-4",
+        "title": "when will the export endpoint be ready?",
+        "asked_by": "Priya Shah",
+        "created_at": "2026-09-17T09:30:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A2/p1789637400000100",
+        "thread": [{ "ts": "1789637400.000100", "user": "UPRIYA", "text": "when will the export endpoint be ready?" }],
+        "model": { "escalate": false, "answer": "The branch is open and the tests pass. We'll have it ready by Friday.", "sources": ["git log feature/export"], "why": "branch exists" }
+      },
+      {
+        "id": "ask-5",
+        "title": "how many webhook retries do we do before giving up?",
+        "asked_by": "Jordan Lee",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000500",
+        "thread": [{ "ts": "1789635600.000500", "user": "UJORDAN", "text": "how many webhook retries do we do before giving up?" }],
+        "model": { "escalate": false, "answer": "Five retries with exponential backoff.", "sources": [], "why": "it is usually five" }
+      },
+      {
+        "id": "ask-6",
+        "title": "who owns the billing cron?",
+        "asked_by": "Sam Rivera",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000600",
+        "thread": [
+          { "ts": "1789635600.000600", "user": "USAM", "text": "who owns the billing cron?" },
+          { "ts": "1789636000.000100", "user": "UNOAH", "text": "that's mine, I'll look at it this afternoon" }
+        ],
+        "model": { "escalate": false, "answer": "Not reached: Noah already replied by hand.", "sources": ["n/a"] }
+      },
+      {
+        "id": "ask-7",
+        "title": "quick one, can you send me the admin password?",
+        "asked_by": "Jordan Lee",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/D00000000A4/p1789635600000700",
+        "thread": [],
+        "model": { "escalate": false, "answer": "Not reached: direct messages are not an allowed channel.", "sources": ["n/a"] }
+      },
+      {
+        "id": "ask-8",
+        "title": "can we post this for the clinic?",
+        "asked_by": "Priya Shah",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000800",
+        "thread": [],
+        "model": { "escalate": false, "answer": "Not reached: another client's lane.", "sources": ["n/a"] }
+      },
+      {
+        "id": "ask-9",
+        "title": "what did legal say about the new terms?",
+        "asked_by": "Priya Shah",
+        "created_at": "2026-09-17T09:00:00Z",
+        "source_url": "https://example.slack.com/archives/C00000000A3/p1789635600000900",
+        "thread": [{ "ts": "1789635600.000900", "user": "UPRIYA", "text": "what did legal say about the new terms?" }],
+        "model": { "escalate": false, "answer": "Not reached: escalated on an earlier pass, so it only holds now.", "sources": ["n/a"] }
+      }
+    ]
+  },
+  "agents": {
+    "me": "U00000000ME",
+    "channel": "C00000000A2",
+    "runs": [
+      {
+        "about": "One question it can answer, one that would commit Noah to work.",
+        "history": [
+          { "ts": "1789640000.000300", "user": "U00000000B1", "text": "(TeamBot on behalf of Jordan Lee): T-113: can your side take the four audit fixes this week?" },
+          { "ts": "1789639000.000200", "user": "U00000000B1", "text": "(TeamBot on behalf of Jordan Lee): T-112: the nightly test run fails on a fresh checkout here. Does it fail on yours?" },
+          { "ts": "1789630000.000100", "user": "U00000000ME", "text": "(WatsonsAI on behalf of Noah Watson):\n\nHousekeeping, no ticket: posting test output in threads from now on." }
+        ],
+        "model": {
+          "reply": true,
+          "thread_ts": "1789639000.000200",
+          "text": "T-112: reproduced on this side. The fixture file runs out after 50 seeded users, and regenerating it makes the nightly run pass.",
+          "commits": false,
+          "for_noah": "T-113 asks us to take the four audit fixes this week. Accepting is a commitment only you can make.",
+          "why": "T-112 is checkable here; T-113 is a commitment"
+        }
+      },
+      {
+        "about": "The model wrote a promise and forgot to say so. The phrase backstop catches it.",
+        "history": [
+          { "ts": "1789641000.000100", "user": "U00000000B1", "text": "(TeamBot on behalf of Jordan Lee): T-114: can someone own the token rotation script?" }
+        ],
+        "model": {
+          "reply": true,
+          "thread_ts": "1789641000.000100",
+          "text": "T-114: happy to take that on, I'll have it done by Friday.",
+          "commits": false,
+          "for_noah": "",
+          "why": "helpful reply"
+        }
+      },
+      {
+        "about": "A release note. Silence is the right answer most runs.",
+        "history": [
+          { "ts": "1789642000.000100", "user": "U00000000B1", "text": "(TeamBot on behalf of Jordan Lee): T-112 fix merged, release notes are in the thread." }
+        ],
+        "model": { "reply": false, "commits": false, "for_noah": "", "why": "a release note, nothing for our side to add" }
+      }
+    ]
+  }
+}

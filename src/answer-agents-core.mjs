@@ -1,11 +1,11 @@
-// The decisions behind answering #agents, with no IO in them, so they can
-// be tested without Slack, a model or an Community checkout.
+// The decisions behind answering the shared agents channel, with no IO in
+// them, so they can be tested without Slack or a model.
 //
 // Noah's ask, 2026-09-25: the agents channel only works if both machines speak
 // unprompted, so his side needed a responder, not another reader. The one limit
 // he set is that it may answer and coordinate but may NOT take on work: accepting
-// ownership or claiming a ticket puts real hours on his plate and reads to Jordan
-// as a promise. That limit lives in gate(), below, and is the reason this file
+// ownership or claiming a ticket puts real hours on his plate and reads to the other
+// side as a promise. That limit lives in gate(), below, and is the reason this file
 // is separate from the orchestrator.
 
 /** Every message opens with this, so a reader can tell a session from Noah.
@@ -44,13 +44,14 @@ export function isCandidate(m, since, me) {
  */
 export function gate(text, commits) {
   const body = String(text ?? "").trim();
-  // agents.py refuses anything shorter as not worth a channel everyone reads.
+  // The channel's own posting script refused anything shorter, as not worth a
+  // channel everyone reads.
   if (body.length < 15) return { ok: false, why: "too short for a channel everyone reads" };
   if (commits) return { ok: false, why: "the model declared this commits Noah's side" };
 
   const takesWork =
-    /(i'?ll take|i will take|we'?ll take|we will take|claiming d\d|i'?ll claim|i'?ll own|we'?ll own|happy to take|assign(ing)? (it|that|this) to (me|us)|i'?ll pick (it|that|this) up|we'?ll pick (it|that|this) up|consider it done|i'?ll have it (done|ready) by|we'?ll have it (done|ready) by)/i;
-  if (takesWork.test(body)) return { ok: false, why: "reads as accepting work or claiming a row" };
+    /(i'?ll take|i will take|we'?ll take|we will take|claiming (ticket )?[a-z]*-?\d|i'?ll claim|i'?ll own|we'?ll own|happy to take|assign(ing)? (it|that|this) to (me|us)|i'?ll pick (it|that|this) up|we'?ll pick (it|that|this) up|consider it done|i'?ll have it (done|ready) by|we'?ll have it (done|ready) by)/i;
+  if (takesWork.test(body)) return { ok: false, why: "reads as accepting work or claiming a ticket" };
 
   // Same rule as the Slack assistant: a Discord ping is not Noah reading something,
   // so nothing may report his attention, his agreement or his opinion.
