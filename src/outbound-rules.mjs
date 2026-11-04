@@ -13,6 +13,15 @@
 
 import { SIGNATURE } from "./answer-slack-core.mjs";
 
+/**
+ * Anything shaped like a credential. The model reads untrusted Slack text and can
+ * open files to cite them, so a crafted message could ask it to quote a key or a
+ * .env line back into the channel. Blocked at the exit, whatever the prompt said:
+ * this check does not depend on the model behaving.
+ */
+export const SECRET_PATTERN =
+  /(xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|(discord(app)?\.com\/api\/webhooks|hooks\.slack\.com\/services)\/\S+|\b[A-Z][A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)\s*=\s*\S{8,})/;
+
 /** Lanes the assistant must never message, however the request is phrased. */
 export const FORBIDDEN_LANES = ["clinic"];
 
@@ -80,6 +89,7 @@ export function checkOutbound(m) {
   // otherwise trip the patterns on every single message.
   const body = m.text.split(SIGNATURE).join("");
   if (SPEAKS_FOR_NOAH_PATTERNS.some((r) => r.test(body))) blocked.push("speaks-for-noah");
+  if (SECRET_PATTERN.test(m.text)) blocked.push("secret");
   if (FORBIDDEN_LANES.includes(m.lane.toLowerCase())) blocked.push("forbidden-lane");
   // Nothing to cite means nothing to check means it was guessed. A hold makes no
   // claim to check, so this is the one rule it is exempt from.

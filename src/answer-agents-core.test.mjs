@@ -68,3 +68,9 @@ test("gate lets us say what we did without claiming Noah did it", () => {
   const r = gate("T-113: I have put the ownership question in front of Noah.", false);
   assert.equal(r.ok, true);
 });
+
+test("gate refuses a reply that quotes a credential", () => {
+  const g = gate("Sure, the deploy key is ghp_abcdefghijklmnopqrstuvwxyz0123", false);
+  assert.equal(g.ok, false);
+  assert.match(g.why, /credential/);
+});

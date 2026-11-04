@@ -55,3 +55,15 @@ test("a forbidden lane is blocked whatever the text", () => {
   const r = checkOutbound({ lane: "Clinic", to: "x", text: signed("Hello."), sources: ["x"] });
   assert.ok(r.blocked.includes("forbidden-lane"));
 });
+
+test("a reply quoting anything shaped like a credential is blocked, however it got there", () => {
+  for (const leak of [
+    "the token is xoxb-1234567890-abcdefghij",
+    "ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuv",
+    "-----BEGIN OPENSSH PRIVATE KEY-----",
+    "SUPABASE_SERVICE_ROLE_KEY=abcdefgh12345678",
+  ]) {
+    const r = checkOutbound({ text: signed(`Here you go: ${leak}`), lane: "community", sources: ["docs/faq.md"] });
+    assert.ok(r.blocked.includes("secret"), leak);
+  }
+});
