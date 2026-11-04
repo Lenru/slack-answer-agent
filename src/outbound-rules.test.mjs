@@ -94,3 +94,7 @@ test("ordinary prose about keys and tokens still gets through", () => {
     assert.equal(containsSecret(ok), false, ok);
   }
 });
+
+test("an env-style secret line is blocked even when its value has no digit", () => {
+  assert.ok(containsSecret("DB_PASSWORD=correcthorsebattery"));
+});

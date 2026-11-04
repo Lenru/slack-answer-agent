@@ -29,6 +29,9 @@ const TOKEN_PATTERN =
 // value must hold a digit, so prose like "the key: remember to rotate" passes.
 const ASSIGNMENT_PATTERN =
   /[\w.-]*(key|token|secret|passw(or)?d|pwd|credential|dsn)[\w.-]*["']?\s*[:=]\s*["']?(?=[^\s"']*\d)[^\s"']{12,}/i;
+// `DB_PASSWORD=...` env style: no digit needed, because a line shaped like this
+// is a secret whatever its value looks like.
+const ENV_LINE_PATTERN = /\b[A-Z][A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PWD)\s*=\s*\S{8,}/;
 // scheme://user:password@host
 const URL_CREDENTIAL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^\s:@\/]+:[^\s@\/]+@/i;
 const SECRET_ENV_NAME = /key|token|secret|pass|pwd|credential|dsn|webhook/i;
@@ -36,7 +39,7 @@ const SECRET_ENV_NAME = /key|token|secret|pass|pwd|credential|dsn|webhook/i;
 /** Does this text contain a credential, by format or by being one of ours? */
 export function containsSecret(text) {
   const s = String(text ?? "");
-  if (TOKEN_PATTERN.test(s) || ASSIGNMENT_PATTERN.test(s) || URL_CREDENTIAL_PATTERN.test(s)) return true;
+  if (TOKEN_PATTERN.test(s) || ENV_LINE_PATTERN.test(s) || ASSIGNMENT_PATTERN.test(s) || URL_CREDENTIAL_PATTERN.test(s)) return true;
   // Read at call time, not import time: the runners load .env after importing this.
   return Object.entries(process.env).some(
     ([name, value]) => SECRET_ENV_NAME.test(name) && value && value.length >= 12 && s.includes(value),
